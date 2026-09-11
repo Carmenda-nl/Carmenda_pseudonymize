@@ -9,6 +9,7 @@ import os
 import sys
 from pathlib import Path
 
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -37,8 +38,8 @@ class Settings(BaseSettings):
     debug: bool = False
     log_level: str = 'INFO'
     environment: str = environment
-    m2m_hash: str = ''
-    data_encryption_key: str = ''
+    m2m_hash: SecretStr = SecretStr('')
+    data_encryption_key: SecretStr = SecretStr('')
     input_folder: str = input_folder
     output_folder: str = output_folder
     model_config = SettingsConfigDict(env_file=app_base / '.env')

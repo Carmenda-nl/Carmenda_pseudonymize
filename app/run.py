@@ -33,7 +33,7 @@ async def lifespan(_: FastAPI) -> AsyncGenerator[None]:
     logger.handlers = logging.getLogger('uvicorn').handlers
     logger.propagate = False
 
-    if settings.m2m_hash:
+    if settings.m2m_hash.get_secret_value():
         logger.info('Starting in Gateway mode: M2M secret configured')
     else:
         logger.warning('Starting in Standalone mode: no M2M secret set')
