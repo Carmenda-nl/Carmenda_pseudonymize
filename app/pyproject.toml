@@ -8,6 +8,7 @@ dependencies = [
     'fastapi[standard]>=0.136.1',
     'fastexcel>=0.21.0',
     'polars[pandas]>=1.38.1',
+    "pynacl>=1.6.2",
     'rich>=14.3.2',
     'xlsxwriter>=3.2.9',
 ]
