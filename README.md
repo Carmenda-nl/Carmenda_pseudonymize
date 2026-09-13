@@ -172,6 +172,7 @@ LOG_LEVEL=INFO
 HOST=127.0.0.1
 PORT=8001
 M2M_HASH=
+DATA_ENCRYPTION_KEY=
 ```
 
 > **Note:** Set `DEBUG=True` to enable the Swagger UI at `/docs`.
@@ -181,6 +182,9 @@ M2M_HASH=
 > disabled. Set it (matching the gateway's `ENGINE_M2M_HASH`) to run behind the gateway:
 > the gateway then owns file I/O, and every request must carry a matching `X-M2M-Key`
 > header or it is rejected with `401`. The active mode is logged at startup.
+
+> **Note:** `DATA_ENCRYPTION_KEY` must match the gateway's key, if used.
+>  Inputs and datakeys are decrypted in memory, outputs and datakeys are written encrypted.
 
 ### Step 4: Run the Server
 

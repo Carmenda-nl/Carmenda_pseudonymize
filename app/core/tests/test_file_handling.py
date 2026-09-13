@@ -11,9 +11,11 @@ import logging
 from pathlib import Path
 
 import polars as pl
-import pytest
 
-from core.utils.file_handling import save_datafile, save_datakey
+import pytest
+from core.utils.crypto import MAGIC, read_encrypted, write_encrypted
+from core.utils.file_handling import load_datafile, load_datakey, save_datafile, save_datakey
+from core.utils.progress_tracker import ProgressTracker
 
 # ----------------------------------- FIXTURES ------------------------------------ #
 
@@ -41,8 +43,10 @@ class TestSaveDatafile:
 
         saved = output_folder / 'test_pseudonymised.csv'
         assert saved.exists()
+        assert saved.read_bytes().startswith(MAGIC)
+        assert b'Alice' not in saved.read_bytes()
 
-        result = pl.read_csv(saved)
+        result = pl.read_csv(read_encrypted(saved))
         assert result['name'].to_list() == ['Alice', 'Bob']
 
     def test_creates_output_folder(self, tmp_path: Path) -> None:
@@ -96,7 +100,11 @@ class TestSaveDatakey:
 
         save_datakey(df, 'test.csv', str(tmp_path))
 
-        content = (tmp_path / 'test_key.csv').read_text(encoding='utf-8')
+        raw = (tmp_path / 'test_key.csv').read_bytes()
+        assert raw.startswith(MAGIC)
+        assert b'Jan' not in raw
+
+        content = read_encrypted(tmp_path / 'test_key.csv').decode('utf-8')
         assert 'Clientnaam,Synoniemen,Code' in content
         assert 'Jan,J,C001' in content
 
@@ -127,3 +135,45 @@ class TestSaveDatakey:
             save_datakey(df, 'test.csv', str(tmp_path))
 
         assert 'Cannot write datakey' in caplog.text
+
+
+# --------------------------------- LOAD TESTS ---------------------------------- #
+
+
+class TestLoadEncrypted:
+    """Inputs are read from encrypted containers and decrypted in memory only."""
+
+    def test_load_datafile_csv(self, tmp_path: Path) -> None:
+        """An encrypted CSV input is loaded into a DataFrame."""
+        source = tmp_path / 'input.csv'
+        write_encrypted(source, b'name,report\nAlice,visited\nBob,discharged\n')
+
+        df = load_datafile(str(source), ProgressTracker())
+
+        assert df is not None
+        assert df['name'].to_list() == ['Alice', 'Bob']
+
+    def test_load_datafile_missing(self, tmp_path: Path) -> None:
+        """A missing input returns None."""
+        assert load_datafile(str(tmp_path / 'missing.csv'), ProgressTracker()) is None
+
+    def test_load_datakey(self, tmp_path: Path) -> None:
+        """An encrypted datakey is loaded with normalised column names."""
+        source = tmp_path / 'key.csv'
+        write_encrypted(source, b'Clientnaam,Synoniemen,Code\nJan Jansen,Jantje,C001\n ,x,C002\n')
+
+        df = load_datakey(str(source))
+
+        assert df is not None
+        assert df.columns == ['clientname', 'synonyms', 'code']
+        assert df['clientname'].to_list() == ['Jan Jansen']
+
+    def test_roundtrip_through_save_and_load(self, tmp_path: Path) -> None:
+        """What save_datakey writes, load_datakey reads back."""
+        df = pl.DataFrame({'clientname': ['Jan'], 'synonyms': ['J'], 'code': ['C001']})
+        save_datakey(df, 'test.csv', str(tmp_path))
+
+        loaded = load_datakey(str(tmp_path / 'test_key.csv'))
+
+        assert loaded is not None
+        assert loaded.to_dicts() == [{'clientname': 'Jan', 'synonyms': 'J', 'code': 'C001'}]
